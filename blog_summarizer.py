@@ -21,6 +21,7 @@ blog_scraper=Agent(
     goal="Extract complete and accurate information from a blog URLs",
     backstory="You are an expert web researcher specialized in extracting main content from blogs while filtering out ads and navigation elements.",
     llm=llm,
+    tools=tools,
     verbose=True,
     allow_delegation=False,
 )
