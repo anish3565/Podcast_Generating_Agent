@@ -5,3 +5,5 @@ gradio
 elevenlabs
 python-dotenv
 firecrawl
+requests
+beautifulsoup4
