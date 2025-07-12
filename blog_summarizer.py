@@ -1,6 +1,12 @@
 import os
 from crewai import LLM, Agent, Process, Task, Crew
 from crewai_tools import FirecrawlScrapeWebsiteTool
+import sys
+import re
+from datetime import datetime
+
+import warnings
+warnings.filterwarnings('ignore')
 
 # Setup LLM
 llm = LLM(
@@ -17,7 +23,6 @@ def create_scraping_tool():
     
     return FirecrawlScrapeWebsiteTool(
         api_key=api_key,
-        # Add any additional configuration if needed
     )
 
 # Agent for scraping blog content
@@ -83,13 +88,13 @@ def summarize_blog_task(scrape_task):
         context=[scrape_task],
     )
 
-# Define Crew with error handling
+# Defining Crew with error handling
 def create_blog_summary_crew(url, use_fallback=False):
-    # Validate URL format
+    # URL format validation 
     if not url.startswith(('http://', 'https://')):
         raise ValueError(f"Invalid URL format: {url}. URL must start with http:// or https://")
     
-    # Choose scraping approach
+    # Choosing between scraping approach
     if use_fallback:
         scrape_task = scrape_blog_task_fallback(url)
     else:
@@ -140,22 +145,40 @@ def test_firecrawl_tool(url):
     except Exception as e:
         print(f"Tool test failed: {str(e)}")
         return None
+    
 
-# Example usage
+def sanitize_filename(url: str) -> str:
+    """Generating a safe filename from a URL and timestamp."""
+    base_name = re.sub(r'https?://', '', url)
+    base_name = re.sub(r'\W+', '_', base_name).strip('_')
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    return f"{base_name}_{timestamp}.md"
+
 if __name__ == "__main__":
-    url = "https://ai.meta.com/blog/llama-helps-efficiency-anz-bank/"
-    
-    # Test the tool directly first
-    print("Testing Firecrawl tool directly...")
+    if len(sys.argv) > 1:
+        url = sys.argv[1]
+    else:
+        url = input("🔗 Enter blog URL: ").strip()
+
+    # Testing Firecrawl tool directly first
+    print("\n🔍 Testing Firecrawl tool directly...")
     test_result = test_firecrawl_tool(url)
-    
+
     if test_result:
-        print("\nTool test passed, running full crew...")
+        print("\n✅ Firecrawl tool passed. Running full Crew process...")
         summary = summarize_blog(url)
     else:
-        print("\nTool test failed, using fallback method...")
+        print("\n⚠️ Firecrawl tool failed. Using fallback scraper...")
         summary = summarize_blog(url, use_fallback=True)
-    
-    print("\nBlog Summary:")
-    print("=" * 50)
-    print(summary)
+
+    markdown_summary = f"# 🎙️ Podcast Summary\n\n**URL**: {url}\n\n{summary}"
+
+    # Saving the file in 'summaries/' folder
+    os.makedirs("summaries", exist_ok=True)
+    filename = sanitize_filename(url)
+    filepath = os.path.join("summaries", filename)
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(markdown_summary)
+
+    print(f"\n✅ Summary saved to: {filepath}")
