@@ -4,7 +4,8 @@ from crewai_tools import FirecrawlScrapeWebsiteTool
 import sys
 import re
 from datetime import datetime
-
+import requests
+from bs4 import BeautifulSoup
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -20,7 +21,7 @@ def create_scraping_tool():
     api_key = os.environ.get("FIRECRAWL_API_KEY")
     if not api_key:
         raise ValueError("FIRECRAWL_API_KEY environment variable is required")
-    
+
     return FirecrawlScrapeWebsiteTool(
         api_key=api_key,
     )
@@ -48,29 +49,32 @@ blog_summarizer = Agent(
     allow_delegation=False,
 )
 
-# Fixed task for scraping blog content
 def scrape_blog_task(url):
-    return Task(
-        description=(
-            f"Use the Firecrawl web scrape tool to extract the main content from this URL: {url}. "
-            "Focus on getting the article text while filtering out navigation, ads, and other non-content elements. "
-            "Make sure to pass the URL correctly to the tool."
-        ),
-        expected_output="Full text content of the blog post extracted from the webpage",
-        agent=blog_scraper,
-    )
+    try:
+        tool = create_scraping_tool()
+        print("[INFO] Trying Firecrawl tool for URL:", url)
+        result = tool.run(url=url)
+        print("[INFO] Firecrawl success. Creating task with scraped content.")
+        return Task(
+            description="Content fetched using Firecrawl tool.",
+            expected_output=result,
+            agent=blog_scraper,
+        )
+    except Exception as e:
+        print(f"[WARNING] Firecrawl tool failed: {e}")
+        print("[INFO] Falling back to BeautifulSoup for scraping.")
+        try:
+            response = requests.get(url)
+            soup = BeautifulSoup(response.content, "html.parser")
+            text = soup.get_text(separator="\n", strip=True)[:4000]  # Truncate to 4K chars
+        except Exception as bs_e:
+            raise RuntimeError(f"Both Firecrawl and fallback scraping failed: {bs_e}")
 
-# Alternative fallback scraping task (if Firecrawl continues to fail)
-def scrape_blog_task_fallback(url):
-    return Task(
-        description=(
-            f"Since the Firecrawl tool is having issues, provide a detailed analysis of what content "
-            f"would typically be found at this URL: {url}. Based on the URL structure and domain, "
-            "provide a comprehensive summary of the likely content themes and key points."
-        ),
-        expected_output="Detailed analysis of expected content based on URL and domain knowledge",
-        agent=blog_scraper,
-    )
+        return Task(
+            description="Fallback content scraped using BeautifulSoup.",
+            expected_output=text,
+            agent=blog_scraper,
+        )
 
 # Task for summarizing blog content
 def summarize_blog_task(scrape_task):
@@ -88,18 +92,12 @@ def summarize_blog_task(scrape_task):
         context=[scrape_task],
     )
 
-# Defining Crew with error handling
-def create_blog_summary_crew(url, use_fallback=False):
-    # URL format validation 
+# Define Crew
+def create_blog_summary_crew(url):
     if not url.startswith(('http://', 'https://')):
         raise ValueError(f"Invalid URL format: {url}. URL must start with http:// or https://")
-    
-    # Choosing between scraping approach
-    if use_fallback:
-        scrape_task = scrape_blog_task_fallback(url)
-    else:
-        scrape_task = scrape_blog_task(url)
-    
+
+    scrape_task = scrape_blog_task(url)
     summarize_task = summarize_blog_task(scrape_task)
 
     crew = Crew(
@@ -110,32 +108,16 @@ def create_blog_summary_crew(url, use_fallback=False):
     )
     return crew
 
-def summarize_blog(url, use_fallback=False):
-    """
-    Summarize blog content from a URL.
-    
-    Args:
-        url (str): The blog URL to scrape and summarize
-        use_fallback (bool): If True, uses fallback method instead of Firecrawl
-    
-    Returns:
-        str: The summarized content
-    """
+def summarize_blog(url):
     try:
-        crew = create_blog_summary_crew(url, use_fallback=use_fallback)
+        crew = create_blog_summary_crew(url)
         result = crew.kickoff()
         return result.raw
     except Exception as e:
-        print(f"Error processing URL {url}: {str(e)}")
-        if not use_fallback:
-            print("Trying fallback method...")
-            return summarize_blog(url, use_fallback=True)
-        else:
-            raise
+        return f"[ERROR] Failed to summarize blog: {e}"
 
 # Debugging function to test tool directly
 def test_firecrawl_tool(url):
-    """Test the Firecrawl tool directly to debug issues"""
     try:
         tool = create_scraping_tool()
         result = tool.run(url=url)
@@ -145,10 +127,8 @@ def test_firecrawl_tool(url):
     except Exception as e:
         print(f"Tool test failed: {str(e)}")
         return None
-    
 
 def sanitize_filename(url: str) -> str:
-    """Generating a safe filename from a URL and timestamp."""
     base_name = re.sub(r'https?://', '', url)
     base_name = re.sub(r'\W+', '_', base_name).strip('_')
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -160,20 +140,12 @@ if __name__ == "__main__":
     else:
         url = input("🔗 Enter blog URL: ").strip()
 
-    # Testing Firecrawl tool directly first
-    print("\n🔍 Testing Firecrawl tool directly...")
+    print("\n Testing Firecrawl tool directly")
     test_result = test_firecrawl_tool(url)
 
-    if test_result:
-        print("\n✅ Firecrawl tool passed. Running full Crew process...")
-        summary = summarize_blog(url)
-    else:
-        print("\n⚠️ Firecrawl tool failed. Using fallback scraper...")
-        summary = summarize_blog(url, use_fallback=True)
-
+    summary = summarize_blog(url)
     markdown_summary = f"# 🎙️ Podcast Summary\n\n**URL**: {url}\n\n{summary}"
 
-    # Saving the file in 'summaries/' folder
     os.makedirs("summaries", exist_ok=True)
     filename = sanitize_filename(url)
     filepath = os.path.join("summaries", filename)
