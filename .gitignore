@@ -4,3 +4,4 @@ summaries/
 podcasts/
 .gradio
 __pycache__/
+command_list.py
