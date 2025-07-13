@@ -1,3 +1,6 @@
 venv/
 .env
 summaries/
+podcasts/
+.gradio
+__pycache__/
