@@ -1,19 +1,20 @@
 FROM python:3.11-slim 
 
-# Set working directory
+# Working directory
 WORKDIR /app
 
-# Copy requirements first (for cache efficiency)
+# Requirements
 COPY requirements.txt .
 
-# Install dependencies
+# Dependencies
 RUN pip install --default-timeout=100 --no-cache-dir -r requirements.txt
 
 # Copy the app code
 COPY blog_summarizer.py .
+COPY app.py .
 
-# Expose port (optional for web)
-EXPOSE 8000
+# Expose port
+EXPOSE 7777
 
-# Default command
-CMD ["python", "blog_summarizer.py"]
+# Commands
+CMD ["python", "app.py"]
