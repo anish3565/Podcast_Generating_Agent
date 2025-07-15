@@ -9,11 +9,11 @@ COPY requirements.txt .
 # Dependencies
 RUN pip install --default-timeout=100 --no-cache-dir -r requirements.txt
 
-# Copy the app code
+# Copying the app code
 COPY blog_summarizer.py .
 COPY app.py .
 
-# Expose port
+# Exposing port
 EXPOSE 7777
 
 # Commands
