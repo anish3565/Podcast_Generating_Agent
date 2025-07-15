@@ -44,7 +44,7 @@ def process_url(url):
     except Exception as e:
         return f"❌ Error: {str(e)}", "", None
 
-# Build Gradio Interface
+# Gradio Interface
 with gr.Blocks() as demo:
     gr.Markdown("# 🎙️ AI Podcast Generator")
     gr.Markdown("Enter a blog URL to generate a podcast episode from its content.")
