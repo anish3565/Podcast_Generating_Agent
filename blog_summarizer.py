@@ -16,7 +16,7 @@ llm = LLM(
     api_key=os.environ.get("GEMINI_API_KEY"),
 )
 
-# Setup tools with proper configuration
+# Setup tools
 def create_scraping_tool():
     api_key = os.environ.get("FIRECRAWL_API_KEY")
     if not api_key:
@@ -92,7 +92,7 @@ def summarize_blog_task(scrape_task):
         context=[scrape_task],
     )
 
-# Define Crew
+# Defining Crew
 def create_blog_summary_crew(url):
     if not url.startswith(('http://', 'https://')):
         raise ValueError(f"Invalid URL format: {url}. URL must start with http:// or https://")
