@@ -1,4 +1,6 @@
-🎙️ Blog Summary and Audio Podcast Generating Agent
+# 🎙️ Blog Summary and Audio Podcast Generating Agent
+
+--- 
 
 ![App Screenshot](assets/1.png)
 
